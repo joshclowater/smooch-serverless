@@ -22,6 +22,8 @@ exports.handler = async (event, context) => {
   });
   
   const postData = JSON.parse(event.body).data;
+
+  console.log('Sending message/data', postData);
   
   const postCalls = connectionData.Items.map(async ({ connectionId }) => {
     try {
