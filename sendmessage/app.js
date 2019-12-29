@@ -1,12 +1,11 @@
 const AWS = require('aws-sdk');
 AWS.config.update({ region: process.env.AWS_REGION });
-const ddb = new AWS.DynamoDB.DocumentClient({ apiVersion: '2012-08-10' });
+const ddb = new AWS.DynamoDB.DocumentClient();
 
 const { TABLE_NAME } = process.env;
 
-exports.handler = async (event, context) => {
+exports.handler = async (event) => {
   let connectionData;
-  
   try {
     connectionData = await ddb.scan({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' }).promise();
   } catch (e) {

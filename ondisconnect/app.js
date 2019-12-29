@@ -1,19 +1,25 @@
-var AWS = require("aws-sdk");
+const AWS = require('aws-sdk');
 AWS.config.update({ region: process.env.AWS_REGION });
-var DDB = new AWS.DynamoDB({ apiVersion: "2012-10-08" });
+const ddb = new AWS.DynamoDB.DocumentClient();
 
-exports.handler = function (event, context, callback) {
-  var deleteParams = {
-    TableName: process.env.TABLE_NAME,
-    Key: {
-      connectionId: { S: event.requestContext.connectionId }
-    }
-  };
+exports.handler = async (event) => {
 
-  DDB.deleteItem(deleteParams, function (err) {
-    callback(null, {
-      statusCode: err ? 500 : 200,
-      body: err ? "Failed to disconnect: " + JSON.stringify(err) : "Disconnected."
-    });
-  });
+  const { connectionId } = event.requestContext;
+  const logContext = { connectionId };
+
+  console.log('ondisconnect', logContext);
+
+  try {
+    await ddb.delete({
+      TableName: process.env.TABLE_NAME,
+      Key: {
+        connectionId: event.requestContext.connectionId
+      }
+    }).promise();
+  } catch (e) {
+    console.error('An error occured deleting the connection', { error: e, ...logContext });
+    return { statusCode: 500, body: 'Failed to disconnect.' };
+  }
+
+  return { statusCode: 200, body: 'Disconnected.' };
 };
