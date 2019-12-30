@@ -126,6 +126,12 @@ Resources:
       Policies:
       - DynamoDBCrudPolicy:
           TableName: !Ref TableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GameWebsocket}/*'
   OnConnectPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
@@ -148,6 +154,12 @@ Resources:
       Policies:
       - DynamoDBCrudPolicy:
           TableName: !Ref TableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GameWebsocket}/*'
   OnDisconnectPermission:
     Type: AWS::Lambda::Permission
     DependsOn:

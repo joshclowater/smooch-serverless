@@ -32,7 +32,7 @@ exports.handler = async (event) => {
 
     await apigwManagementApi.postToConnection({
       ConnectionId: connectionId,
-      Data: { type: 'HOST/CONNECTED', gameId: gameName }
+      Data: JSON.stringify({ type: 'HOST/CONNECTED', gameId: name })
     }).promise();
 
     console.log('Host created game', logContext);
@@ -40,7 +40,7 @@ exports.handler = async (event) => {
   } else if (type === 'player') {
     await apigwManagementApi.postToConnection({
       ConnectionId: connectionId,
-      Data: { type: 'PLAYER/CONNECTED' }
+      Data: JSON.stringify({ type: 'PLAYER/CONNECTED' })
     }).promise();
 
     console.log('Player connected');
