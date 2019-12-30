@@ -4,13 +4,13 @@ Description: >
   werewolves.io-serverless
 
   SAM Template for werewolves.io-serverless that has the DynamoDB table and Lambda
-  functions on API Gateway needed to play game.
+  functions on API Gateway needed to connect and play game.
 
 Parameters:
   TableName:
     Type: String
-    Default: 'simplechat_connections'
-    Description: (Required) The name of the new DynamoDB to store connection identifiers for each connected clients. Minimum 3 characters
+    Default: 'werewolvesio_serverless_games'
+    Description: (Required) The name of the DynamoDB to store games, their statuses, and connection identifiers for each connected clients. Minimum 3 characters.
     MinLength: 3
     MaxLength: 50
     AllowedPattern: ^[A-Za-z_]+$
@@ -102,10 +102,10 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: "connectionId"
+      - AttributeName: "name"
         AttributeType: "S"
       KeySchema:
-      - AttributeName: "connectionId"
+      - AttributeName: "name"
         KeyType: "HASH"
       ProvisionedThroughput:
         ReadCapacityUnits: 5
