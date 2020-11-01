@@ -157,11 +157,7 @@ Resources:
       KeySchema:
       - AttributeName: "name"
         KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 0
-        WriteCapacityUnits: 0
-      SSESpecification:
-        SSEEnabled: Frue
+      BillingMode: PAY_PER_REQUEST
       TableName: !Ref GameTableName
       TimeToLiveSpecification:
         AttributeName: ttl
@@ -175,11 +171,7 @@ Resources:
       KeySchema:
       - AttributeName: "connectionId"
         KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 0
-        WriteCapacityUnits: 0
-      SSESpecification:
-        SSEEnabled: False
+      BillingMode: PAY_PER_REQUEST
       TableName: !Ref PlayerTableName
   OnConnectFunction:
     Type: AWS::Serverless::Function
@@ -244,12 +236,7 @@ Resources:
       Handler: app.handler
       MemorySize: 128
       Runtime: nodejs12.x
-      # Environment:
-      #   Variables:
-      #     TABLE_NAME: !Ref TableName
-      # Policies:
-      # - DynamoDBCrudPolicy:
-      #     TableName: !Ref TableName
+      Policies:
       - Statement:
         - Effect: Allow
           Action:
@@ -286,11 +273,11 @@ Resources:
           Action:
           - 'execute-api:ManageConnections'
           Resource:
-          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DicekWebsocket}/*'
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GameWebsocket}/*'
   CreateGamePermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - DicekWebsocket
+      - GameWebsocket
       - CreateGameFunction
     Properties:
       Action: lambda:InvokeFunction
@@ -317,11 +304,11 @@ Resources:
           Action:
           - 'execute-api:ManageConnections'
           Resource:
-          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DicekWebsocket}/*'
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GameWebsocket}/*'
   JoinGamePermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - DicekWebsocket
+      - GameWebsocket
       - JoinGameFunction
     Properties:
       Action: lambda:InvokeFunction
