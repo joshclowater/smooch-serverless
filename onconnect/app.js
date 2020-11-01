@@ -2,60 +2,25 @@ const AWS = require('aws-sdk');
 AWS.config.update({ region: process.env.AWS_REGION });
 const ddb = new AWS.DynamoDB.DocumentClient();
 
+const { PLAYER_TABLE_NAME } = process.env;
+
 exports.handler = async (event) => {
 
-  const { connectionId, domainName, stage } = event.requestContext;
-  const type = event.queryStringParameters && event.queryStringParameters.type;
-  const logContext = { connectionId, type };
+  const { connectionId } = event.requestContext;
+  const logContext = { connectionId };
 
   console.log('onconnect', logContext);
 
-  const apigwManagementApi = new AWS.ApiGatewayManagementApi({
-    apiVersion: '2018-11-29',
-    endpoint: domainName + '/' + stage
-  });
+  await ddb.put({
+    TableName: PLAYER_TABLE_NAME,
+    Item: {
+      connectionId,
+      status: 'pending',
+      createdOn: new Date().toISOString()
+    }
+  }).promise();
 
-  if (type === 'host') {
+  console.log('Player connected', logContext);
 
-    const name = makeId();
-    logContext.name = name;
-    await ddb.put({
-      TableName: process.env.TABLE_NAME,
-      Item: {
-        name,
-        gameStatus: 'waiting-for-players',
-        host: connectionId,
-        players: {},
-        createdOn: Date.now()
-      }
-    }).promise();
-
-    await apigwManagementApi.postToConnection({
-      ConnectionId: connectionId,
-      Data: JSON.stringify({ type: 'HOST/CONNECTED', gameId: name })
-    }).promise();
-
-    console.log('Host created game', logContext);
-
-  } else if (type === 'player') {
-    await apigwManagementApi.postToConnection({
-      ConnectionId: connectionId,
-      Data: JSON.stringify({ type: 'PLAYER/CONNECTED' })
-    }).promise();
-
-    console.log('Player connected');
-  } else {
-    console.warn('Tried to connect with invalid type', type);
-    return { statusCode: 400, body: 'Tried to connect with invalid type ' + type };
-  }
-  return { statusCode: 200, body: 'Connected.' };
-};
-
-const makeId = () => {
-  let id = '';
-  const possible = 'abcdefghijklmnopqrstuvwxyz';
-  for (var i = 0; i < 5; i++) {
-    id += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return id;
+  return { statusCode: 200, body: 'Connected' };
 };

@@ -2,26 +2,19 @@ const AWS = require('aws-sdk');
 AWS.config.update({ region: process.env.AWS_REGION });
 const ddb = new AWS.DynamoDB.DocumentClient();
 
+const { PLAYER_TABLE_NAME } = process.env;
+
 exports.handler = async (event) => {
 
-  console.debug('JOSH TEST', event);
+  const { connectionId } = event.requestContext;
+  const logContext = { connectionId };
 
-  // const { connectionId } = event.requestContext;
-  // const logContext = { connectionId };
+  console.log('ondisconnect', logContext);
 
-  // console.log('ondisconnect', logContext);
-
-  // try {
-  //   await ddb.delete({
-  //     TableName: process.env.TABLE_NAME,
-  //     Key: {
-  //       connectionId: event.requestContext.connectionId
-  //     }
-  //   }).promise();
-  // } catch (e) {
-  //   console.error('An error occured deleting the connection', { error: e, ...logContext });
-  //   return { statusCode: 500, body: 'Failed to disconnect.' };
-  // }
+  await ddb.delete({
+    TableName: PLAYER_TABLE_NAME,
+    Key: { connectionId }
+  }).promise();
 
   return { statusCode: 200, body: 'Disconnected.' };
 };

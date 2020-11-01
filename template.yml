@@ -7,14 +7,22 @@ Description: >
   functions on API Gateway needed to connect and play game.
 
 Parameters:
-  TableName:
+  GameTableName:
     Type: String
     Default: 'werewolvesio_serverless_games'
-    Description: (Required) The name of the DynamoDB to store games, their statuses, and connection identifiers for each connected clients. Minimum 3 characters.
+    Description: (Required) The name of the DynamoDB to store games, their statuses, and connection identifiers for each connected clients.
     MinLength: 3
     MaxLength: 50
     AllowedPattern: ^[A-Za-z_]+$
     ConstraintDescription: 'Required. Can be characters and underscore only. No numbers or special characters allowed.'
+  PlayerTableName:
+    Type: String
+    Default: 'werewolvesio_serverless_players'
+    Description: (Required) The name of the DynamoDB table to store werewolves.io serverless players.
+    MinLength: 3
+    MaxLength: 50
+    AllowedPattern: ^[0-9A-Za-z_]+$
+    ConstraintDescription: 'Required. Can be characters and underscore only. No special characters allowed.'
 
 Resources:
   GameWebsocket:
@@ -83,12 +91,54 @@ Resources:
       IntegrationUri: 
         Fn::Sub:
             arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+  CreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref GameWebsocket
+      RouteKey: creategame
+      AuthorizationType: NONE
+      OperationName: CreateRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref CreateInteg
+  CreateInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref GameWebsocket
+      Description: Create Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateGameFunction.Arn}/invocations
+  JoinRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref GameWebsocket
+      RouteKey: joingame
+      AuthorizationType: NONE
+      OperationName: JoinRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref JoinInteg
+  JoinInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref GameWebsocket
+      Description: Join Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${JoinGameFunction.Arn}/invocations
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
     - ConnectRoute
     - SendRoute
     - DisconnectRoute
+    - CreateRoute
+    - JoinRoute
     Properties:
       ApiId: !Ref GameWebsocket
   Stage:
@@ -108,24 +158,42 @@ Resources:
       - AttributeName: "name"
         KeyType: "HASH"
       ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
+        ReadCapacityUnits: 0
+        WriteCapacityUnits: 0
       SSESpecification:
-        SSEEnabled: True
-      TableName: !Ref TableName
+        SSEEnabled: Frue
+      TableName: !Ref GameTableName
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: True
+  PlayersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "connectionId"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "connectionId"
+        KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 0
+        WriteCapacityUnits: 0
+      SSESpecification:
+        SSEEnabled: False
+      TableName: !Ref PlayerTableName
   OnConnectFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: onconnect/
       Handler: app.handler
-      MemorySize: 256
+      MemorySize: 128
       Runtime: nodejs12.x
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
+          TABLE_NAME: !Ref PlayerTableName
       Policies:
       - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+          TableName: !Ref PlayerTableName
       - Statement:
         - Effect: Allow
           Action:
@@ -146,14 +214,14 @@ Resources:
     Properties:
       CodeUri: ondisconnect/
       Handler: app.handler
-      MemorySize: 256
+      MemorySize: 128
       Runtime: nodejs12.x
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
+          TABLE_NAME: !Ref PlayerTableName
       Policies:
       - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+          TableName: !Ref PlayerTableName
       - Statement:
         - Effect: Allow
           Action:
@@ -174,14 +242,14 @@ Resources:
     Properties:
       CodeUri: sendmessage/
       Handler: app.handler
-      MemorySize: 256
+      MemorySize: 128
       Runtime: nodejs12.x
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TableName
-      Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+      # Environment:
+      #   Variables:
+      #     TABLE_NAME: !Ref TableName
+      # Policies:
+      # - DynamoDBCrudPolicy:
+      #     TableName: !Ref TableName
       - Statement:
         - Effect: Allow
           Action:
@@ -197,24 +265,70 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref SendMessageFunction
       Principal: apigateway.amazonaws.com
+  CreateGameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: creategame/
+      Handler: app.handler
+      MemorySize: 128
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          PLAYER_TABLE_NAME: !Ref PlayerTableName
+          GAME_TABLE_NAME: !Ref GameTableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref PlayerTableName
+      - DynamoDBCrudPolicy:
+          TableName: !Ref GameTableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DicekWebsocket}/*'
+  CreateGamePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - DicekWebsocket
+      - CreateGameFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CreateGameFunction
+      Principal: apigateway.amazonaws.com
+  JoinGameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: joingame/
+      Handler: app.handler
+      MemorySize: 128
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          PLAYER_TABLE_NAME: !Ref PlayerTableName
+          GAME_TABLE_NAME: !Ref GameTableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref PlayerTableName
+      - DynamoDBCrudPolicy:
+          TableName: !Ref GameTableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DicekWebsocket}/*'
+  JoinGamePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - DicekWebsocket
+      - JoinGameFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref JoinGameFunction
+      Principal: apigateway.amazonaws.com
 
 Outputs:
-  GamesTableArn:
-    Description: "Games table ARN"
-    Value: !GetAtt GamesTable.Arn
-
-  OnConnectFunctionArn:
-    Description: "OnConnect function ARN"
-    Value: !GetAtt OnConnectFunction.Arn
-
-  OnDisconnectFunctionArn:
-    Description: "OnDisconnect function ARN"
-    Value: !GetAtt OnDisconnectFunction.Arn
-
-  SendMessageFunctionArn:
-    Description: "SendMessage function ARN"
-    Value: !GetAtt SendMessageFunction.Arn
-
   WebSocketURI:
     Description: "The WSS Protocol URI to connect to"
     Value: !Join [ '', [ 'wss://', !Ref GameWebsocket, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref 'Stage'] ]

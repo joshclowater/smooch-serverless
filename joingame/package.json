@@ -1,7 +1,7 @@
 {
-  "name": "on-connect",
+  "name": "join-game",
   "version": "1.0.0",
-  "description": "on connect handler",
+  "description": "join game handler",
   "dependencies": {
     "aws-sdk": "^2.434.0"
   }
